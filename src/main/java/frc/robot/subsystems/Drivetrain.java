@@ -6,8 +6,11 @@ package frc.robot.subsystems;
 
 import edu.wpi.first.wpilibj.BuiltInAccelerometer;
 import edu.wpi.first.wpilibj.Encoder;
+import edu.wpi.first.wpilibj.controller.PIDController;
 import edu.wpi.first.wpilibj.Spark;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import frc.robot.Constants;
 import frc.robot.sensors.RomiGyro;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
@@ -34,16 +37,37 @@ public class Drivetrain extends SubsystemBase {
   // Set up the BuiltInAccelerometer
   private final BuiltInAccelerometer m_accelerometer = new BuiltInAccelerometer();
 
+  private PIDController drivePidController;
+
+  private double lastAngle;
+
   /** Creates a new Drivetrain. */
   public Drivetrain() {
     // Use inches as unit for encoder distances
     m_leftEncoder.setDistancePerPulse((Math.PI * kWheelDiameterInch) / kCountsPerRevolution);
     m_rightEncoder.setDistancePerPulse((Math.PI * kWheelDiameterInch) / kCountsPerRevolution);
+
+    drivePidController = new PIDController(Constants.k_driveP, Constants.k_driveI, Constants.k_driveD);
+
     resetEncoders();
+    resetGyro();
+
+    lastAngle = 0d;
   }
 
   public void arcadeDrive(double xaxisSpeed, double zaxisRotate) {
-    m_diffDrive.arcadeDrive(xaxisSpeed, zaxisRotate);
+    double error;
+    if (Math.abs(zaxisRotate) < 0.1) {
+      error = lastAngle - m_gyro.getAngleZ();
+      //double correction = Constants.k_driveP * error;
+
+      drivePidController.setSetpoint(lastAngle);
+      m_diffDrive.arcadeDrive(xaxisSpeed, drivePidController.calculate(m_gyro.getAngleZ()));
+
+    } else {
+      m_diffDrive.arcadeDrive(xaxisSpeed, zaxisRotate);
+      lastAngle = m_gyro.getAngleZ();
+    }
   }
 
   public void resetEncoders() {
@@ -130,8 +154,11 @@ public class Drivetrain extends SubsystemBase {
     m_gyro.reset();
   }
 
+
   @Override
   public void periodic() {
-    // This method will be called once per scheduler run
+    SmartDashboard.putNumber("angle", m_gyro.getAngleZ());
+    SmartDashboard.putNumber("last_value", lastAngle);
+    
   }
 }
